@@ -1,0 +1,11 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background: #f5f7fb;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+* { box-sizing: border-box; }
