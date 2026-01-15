@@ -1,32 +1,37 @@
 export type SessionType = "heart" | "lung";
 
-/* ---------- Result Types ---------- */
-
+/* ---------------- HEART RESULT ---------------- */
 export interface HeartResult {
-  heartRate?: number;
-  confidence?: number;
-  status?: "Normal" | "Abnormal";
-  summary?: string;
-  duration?: number;
+  status: string;
+  heartRate: number;
+  murmurDetected?: boolean;
+  aiConfidence: number;
+  summary: string;
 }
 
+/* ---------------- LUNG RESULT ---------------- */
 export interface LungResult {
-  respRate?: number;
-  crackles?: boolean;
-  wheezes?: boolean;
-  confidence?: number;
-  status?: "Normal" | "Abnormal";
-  summary?: string;
-  duration?: number;
+  status: string;
+  respRate: number;
+  cracklesDetected: boolean;
+  wheezesDetected: boolean;
+  aiConfidence: number;
+  summary: string;
 }
 
-/* ---------- Session ---------- */
-
-export interface Session {
-  id: string;
-  type: SessionType;
-  name: string;
-  date: string; // ISO string
-  result: HeartResult | LungResult;
-}
-
+/* ---------------- SESSION ---------------- */
+export type Session =
+  | {
+      id: number;
+      type: "heart";
+      name: string;
+      date: string;
+      result: HeartResult;
+    }
+  | {
+      id: number;
+      type: "lung";
+      name: string;
+      date: string;
+      result: LungResult;
+    };

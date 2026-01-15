@@ -9,7 +9,10 @@ interface Props {
 
 export default function SessionCard({ session, onClick }: Props) {
   const isHeart = session.type === "heart";
-  const result = session.result;
+  const result: any = session.result ?? {};
+
+  // Always show normalized name (SessionHistoryUI already ensures it)
+  const title = session.name;
 
   return (
     <div
@@ -26,14 +29,10 @@ export default function SessionCard({ session, onClick }: Props) {
     >
       {/* Header */}
       <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-        <div style={{ fontSize: 28 }}>
-          {isHeart ? "❤️" : "🫁"}
-        </div>
+        <div style={{ fontSize: 28 }}>{isHeart ? "❤️" : "🫁"}</div>
 
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600 }}>
-            {session.name || (isHeart ? "Heart Analysis" : "Lung Analysis")}
-          </div>
+          <div style={{ fontWeight: 600 }}>{title}</div>
 
           <div style={{ fontSize: 12, color: "#64748b" }}>
             {new Date(session.date).toLocaleString()}
@@ -50,25 +49,14 @@ export default function SessionCard({ session, onClick }: Props) {
         }}
       >
         {isHeart && isHeartResult(result) && (
-          <SessionMetric
-            label="Heart Rate"
-            value={result.heartRate}
-            unit="BPM"
-          />
+          <SessionMetric label="Heart Rate" value={result.heartRate ?? "—"} unit="BPM" />
         )}
 
         {!isHeart && isLungResult(result) && (
-          <SessionMetric
-            label="Resp. Rate"
-            value={result.respRate}
-            unit="BrPM"
-          />
+          <SessionMetric label="Resp. Rate" value={result.respRate ?? "—"} unit="BrPM" />
         )}
 
-        <SessionMetric
-          label="Status"
-          value={result.status}
-        />
+        <SessionMetric label="Status" value={result.status ?? "—"} />
       </div>
     </div>
   );
@@ -77,9 +65,9 @@ export default function SessionCard({ session, onClick }: Props) {
 /* ---------------- TYPE GUARDS ---------------- */
 
 function isHeartResult(result: HeartResult | LungResult): result is HeartResult {
-  return "heartRate" in result;
+  return result && typeof (result as any).heartRate !== "undefined";
 }
 
 function isLungResult(result: HeartResult | LungResult): result is LungResult {
-  return "respRate" in result;
+  return result && typeof (result as any).respRate !== "undefined";
 }

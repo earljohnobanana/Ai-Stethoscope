@@ -1,4 +1,5 @@
-import { useState } from "react";
+// frontend/src/ui/lung/LungAnalysisUI.tsx
+import { useEffect, useState } from "react";
 import Screen from "../../components/Screen";
 
 import LungHeader from "./LungHeader";
@@ -6,17 +7,97 @@ import LungStates from "./LungStates";
 import LungResultPanel from "./LungResultPanel";
 import SaveRecordingPanel from "../heart/SaveRecordingPanel";
 
+import { startRecording, stopRecording } from "../../services/recording.service";
+import { saveRecordingName } from "../../services/session.service";
+import { ensureActivePatient } from "../../services/patient.service";
+
 interface Props {
   onBack: () => void;
 }
 
 export default function LungAnalysisUI({ onBack }: Props) {
-  const [isAnalyzing, setIsAnalyzing] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSave, setShowSave] = useState(false);
+  const [recordingName, setRecordingName] = useState("");
+
+  const [patientId, setPatientId] = useState<number | null>(null);
+  const [recordingId, setRecordingId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    ensureActivePatient()
+      .then(setPatientId)
+      .catch((e) => {
+        console.error(e);
+        alert(e?.message ?? "Failed to initialize patient.");
+      });
+  }, []);
+
+  async function handleStart() {
+    if (busy || !patientId) return;
+
+    try {
+      setBusy(true);
+
+      const res: any = await startRecording(patientId, "lung");
+      const id =
+        res?.recording_id ??
+        res?.recordingId ??
+        res?.session_id ??
+        res?.sessionId ??
+        null;
+
+      if (id == null) {
+        alert("Recording started but no recording ID returned.");
+      } else {
+        setRecordingId(Number(id));
+      }
+
+      setIsAnalyzing(true);
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to start recording.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStop() {
+    if (busy) return;
+
+    try {
+      setBusy(true);
+      if (recordingId != null) {
+        await stopRecording(recordingId);
+      }
+      setIsAnalyzing(false);
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to stop recording.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSave(name: string) {
+    if (busy || !recordingId) return;
+
+    try {
+      setBusy(true);
+      await saveRecordingName(recordingId, name.trim());
+
+      setShowSave(false);
+      setRecordingName("");
+      setRecordingId(null);
+
+      alert("Saved! Check Session History.");
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to save recording name.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Screen>
-      {/* FULL SCREEN CONTAINER */}
       <div
         style={{
           height: "100%",
@@ -25,19 +106,15 @@ export default function LungAnalysisUI({ onBack }: Props) {
           backgroundColor: "#f4f6f9",
           padding: 16,
           boxSizing: "border-box",
-          overflow: "hidden", // ❌ no page scroll
+          overflow: "hidden",
         }}
       >
-        {/* HEADER */}
-        <div style={{ flexShrink: 0 }}>
-          <LungHeader
-            title="Lung Analysis"
-            subtitle="Respiratory sound monitoring"
-            onBack={onBack}
-          />
-        </div>
+        <LungHeader
+          title="Lung Analysis"
+          subtitle="Respiratory sound monitoring"
+          onBack={onBack}
+        />
 
-        {/* CONTENT AREA */}
         <div
           style={{
             flex: 1,
@@ -45,30 +122,19 @@ export default function LungAnalysisUI({ onBack }: Props) {
             gridTemplateColumns: "1fr 1fr",
             gap: 16,
             marginTop: 16,
-            minHeight: 0, // 🔑 critical
           }}
         >
-          {/* LEFT — CONTROLS */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateRows: "1fr 1fr", // equal height buttons
-              gap: 16,
-              minHeight: 0,
-            }}
-          >
-            {/* START / STOP */}
-            <div>
-              <LungStates
-                isAnalyzing={isAnalyzing}
-                onStart={() => setIsAnalyzing(true)}
-                onStop={() => setIsAnalyzing(false)}
-              />
-            </div>
+          <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 16 }}>
+            <LungStates
+              isAnalyzing={isAnalyzing}
+              onStart={handleStart}
+              onStop={handleStop}
+            />
 
-            {/* SAVE RESULT */}
             <div
-              onClick={() => setShowSave(true)}
+              onClick={() => {
+                if (!isAnalyzing && recordingId) setShowSave(true);
+              }}
               style={{
                 height: 160,
                 borderRadius: 20,
@@ -80,38 +146,30 @@ export default function LungAnalysisUI({ onBack }: Props) {
                 justifyContent: "center",
                 fontSize: 20,
                 fontWeight: 600,
-                cursor: "pointer",
-                boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
-                userSelect: "none",
+                cursor: isAnalyzing ? "not-allowed" : "pointer",
+                opacity: isAnalyzing ? 0.6 : 1,
               }}
             >
-              <div style={{ fontSize: 32, marginBottom: 6 }}>💾</div>
+              <div style={{ fontSize: 32 }}>💾</div>
               Save Result
             </div>
           </div>
 
-          {/* RIGHT — RESULT PANEL (ONLY THIS SCROLLS) */}
-          <div
-            style={{
-              height: "100%",
-              overflowY: "auto",
-              paddingRight: 4,
-            }}
-          >
-            <LungResultPanel
-              status="Normal"
-              crackles={false}
-              wheezes={false}
-              aiConfidence={92.4}
-              summary="Normal lung sounds detected. No crackles or wheezes present."
-            />
-          </div>
+          <LungResultPanel
+            status="Normal"
+            respRate={20}
+            cracklesDetected={false}
+            wheezesDetected={false}
+            aiConfidence={92.4}
+            summary="No abnormal lung sounds detected."
+          />
         </div>
 
-        {/* SAVE POPUP */}
         {showSave && (
           <SaveRecordingPanel
-            onConfirm={() => setShowSave(false)}
+            name={recordingName}
+            setName={setRecordingName}
+            onConfirm={() => handleSave(recordingName)}
             onCancel={() => setShowSave(false)}
           />
         )}

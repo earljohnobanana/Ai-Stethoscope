@@ -1,4 +1,5 @@
-import { useState } from "react";
+// frontend/src/ui/heart/HeartAnalysisUI.tsx
+import { useEffect, useState } from "react";
 import Screen from "../../components/Screen";
 
 import HeartHeader from "./HeartHeader";
@@ -6,17 +7,121 @@ import HeartStates from "./HeartStates";
 import HeartResultPanel from "./HeartResultPanel";
 import SaveRecordingPanel from "./SaveRecordingPanel";
 
+import { startRecording, stopRecording } from "../../services/recording.service";
+import { saveRecordingName } from "../../services/session.service";
+
+
+import { ensureActivePatient } from "../../services/patient.service";
+
 interface Props {
   onBack: () => void;
 }
 
 export default function HeartAnalysisUI({ onBack }: Props) {
-  const [isAnalyzing, setIsAnalyzing] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSave, setShowSave] = useState(false);
+
+  const [recordingName, setRecordingName] = useState("");
+
+  const [patientId, setPatientId] = useState<number | null>(null);
+  const [recordingId, setRecordingId] = useState<number | null>(null);
+
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    ensureActivePatient()
+      .then((id) => setPatientId(id))
+      .catch((e) => {
+        console.error(e);
+        alert(e?.message ?? "Failed to initialize patient.");
+      });
+  }, []);
+
+  async function handleStart() {
+    if (busy) return;
+
+    if (!patientId) {
+      alert("No patient selected/created yet.");
+      return;
+    }
+
+    try {
+      setBusy(true);
+
+      // ✅ include mode
+      const res: any = await startRecording(patientId, "heart");
+
+      const id =
+        res?.recording_id ??
+        res?.recordingId ??
+        res?.session_id ??
+        res?.sessionId ??
+        null;
+
+      if (id == null) {
+        console.warn("startRecording() response:", res);
+        alert("Recording started but no recording id returned by backend.");
+      } else {
+        setRecordingId(Number(id));
+      }
+
+      setIsAnalyzing(true);
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to start recording.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStop() {
+    if (busy) return;
+
+    try {
+      setBusy(true);
+
+      if (recordingId == null) {
+        console.warn("Stop pressed but recordingId is null.");
+      } else {
+        await stopRecording(recordingId);
+      }
+
+      setIsAnalyzing(false);
+      // ✅ stop only (no auto save)
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to stop recording.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSave(name: string) {
+    if (busy) return;
+
+    if (!recordingId) {
+      alert("No recording to save. Please record first.");
+      return;
+    }
+
+    try {
+      setBusy(true);
+
+      // ✅ this is the only save action now
+      await saveRecordingName(recordingId, name.trim());
+
+      setShowSave(false);
+      setRecordingName("");
+      setRecordingId(null);
+
+      alert("Saved! Check Session History.");
+    } catch (e: any) {
+      alert(e?.message ?? "Failed to save recording name.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <Screen>
-      {/* FULL SCREEN CONTAINER */}
       <div
         style={{
           height: "100%",
@@ -25,19 +130,17 @@ export default function HeartAnalysisUI({ onBack }: Props) {
           backgroundColor: "#f4f6f9",
           padding: 16,
           boxSizing: "border-box",
-          overflow: "hidden", // 🔴 prevents page scroll
+          overflow: "hidden",
         }}
       >
-        {/* HEADER */}
         <div style={{ flexShrink: 0 }}>
           <HeartHeader
             title="Heart Analysis"
             subtitle="Real-time cardiac monitoring"
-            onBack={onBack}// ✅ heart logo beside title (already supported)
+            onBack={onBack}
           />
         </div>
 
-        {/* CONTENT AREA */}
         <div
           style={{
             flex: 1,
@@ -45,30 +148,35 @@ export default function HeartAnalysisUI({ onBack }: Props) {
             gridTemplateColumns: "1fr 1fr",
             gap: 16,
             marginTop: 16,
-            minHeight: 0, // 🔴 critical for scroll control
+            minHeight: 0,
           }}
         >
-          {/* LEFT SIDE — CONTROLS */}
           <div
             style={{
               display: "grid",
-              gridTemplateRows: "1fr 1fr", // equal height buttons
+              gridTemplateRows: "1fr 1fr",
               gap: 16,
               minHeight: 0,
             }}
           >
-            {/* STOP / START */}
             <div>
               <HeartStates
                 isAnalyzing={isAnalyzing}
-                onStart={() => setIsAnalyzing(true)}
-                onStop={() => setIsAnalyzing(false)}
+                onStart={handleStart}
+                onStop={handleStop}
               />
             </div>
 
-            {/* SAVE RESULT */}
             <div
-              onClick={() => setShowSave(true)}
+              onClick={() => {
+                if (isAnalyzing) return;
+                if (!recordingId) {
+                  alert("No recording to save. Please record first.");
+                  return;
+                }
+                setRecordingName("");
+                setShowSave(true);
+              }}
               style={{
                 height: 160,
                 borderRadius: 20,
@@ -80,24 +188,19 @@ export default function HeartAnalysisUI({ onBack }: Props) {
                 justifyContent: "center",
                 fontSize: 20,
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: isAnalyzing ? "not-allowed" : "pointer",
                 boxShadow: "0 10px 20px rgba(0,0,0,0.15)",
                 userSelect: "none",
+                opacity: isAnalyzing ? 0.6 : 1,
               }}
+              title={isAnalyzing ? "Stop first before saving" : "Save result"}
             >
               <div style={{ fontSize: 32, marginBottom: 6 }}>💾</div>
               Save Result
             </div>
           </div>
 
-          {/* RIGHT SIDE — RESULT PANEL (ONLY THIS SCROLLS) */}
-          <div
-            style={{
-              height: "100%",
-              overflowY: "auto",
-              paddingRight: 4,
-            }}
-          >
+          <div style={{ height: "100%", overflowY: "auto", paddingRight: 4 }}>
             <HeartResultPanel
               status="Normal"
               heartRate={70}
@@ -107,12 +210,33 @@ export default function HeartAnalysisUI({ onBack }: Props) {
           </div>
         </div>
 
-        {/* SAVE POPUP */}
         {showSave && (
           <SaveRecordingPanel
-            onConfirm={() => setShowSave(false)}
-            onCancel={() => setShowSave(false)}
+            name={recordingName}
+            setName={setRecordingName}
+            onConfirm={() => handleSave(recordingName)} // ✅ no type mismatch
+            onCancel={() => {
+              setShowSave(false);
+              setRecordingName("");
+            }}
           />
+        )}
+
+        {busy && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 14,
+              right: 14,
+              background: "rgba(17,24,39,0.85)",
+              color: "white",
+              padding: "8px 12px",
+              borderRadius: 12,
+              fontSize: 12,
+            }}
+          >
+            Working…
+          </div>
         )}
       </div>
     </Screen>

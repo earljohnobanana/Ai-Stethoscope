@@ -1,15 +1,31 @@
-// src/navigation/RootNavigator.tsx
 import { useState } from "react";
 
 import HomeDashboard from "../screens/HomeDashboard";
 import HeartAnalysis from "../screens/HeartAnalysis";
 import LungAnalysis from "../screens/LungAnalysis";
 import SessionHistory from "../screens/SessionHistory";
+import SessionDetail from "../screens/SessionDetail";
 
-type ScreenKey = "home" | "heart" | "lung" | "history";
+type Screen = "home" | "heart" | "lung" | "history" | "detail";
 
 export default function RootNavigator() {
-  const [screen, setScreen] = useState<ScreenKey>("home");
+  const [screen, setScreen] = useState<Screen>("home");
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+
+  if (screen === "home") {
+    return (
+      <HomeDashboard
+        onNavigate={(next) => {
+          if (next === "heart") setScreen("heart");
+          else if (next === "lung") setScreen("lung");
+          else if (next === "history") {
+            setSelectedSessionId(null);
+            setScreen("history");
+          }
+        }}
+      />
+    );
+  }
 
   if (screen === "heart") {
     return <HeartAnalysis onBack={() => setScreen("home")} />;
@@ -20,9 +36,22 @@ export default function RootNavigator() {
   }
 
   if (screen === "history") {
-    // If your SessionHistory uses a different prop name, change it here.
-    return <SessionHistory onBack={() => setScreen("home")} />;
+    return (
+      <SessionHistory
+        onBack={() => setScreen("home")}
+        onOpenSession={(sessionId: number) => {
+          setSelectedSessionId(sessionId);
+          setScreen("detail");
+        }}
+      />
+    );
   }
 
-  return <HomeDashboard onNavigate={(s) => setScreen(s)} />;
+  // detail
+  return (
+    <SessionDetail
+      sessionId={selectedSessionId}
+      onBack={() => setScreen("history")}
+    />
+  );
 }

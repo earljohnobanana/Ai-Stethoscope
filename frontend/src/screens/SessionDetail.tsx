@@ -1,11 +1,16 @@
-import type { Session } from "../models/Session";
+// frontend/src/screens/SessionDetail.tsx
 import SessionDetailUI from "../ui/session/SessionDetailUI";
 
 interface Props {
-  session: Session;
+  sessionId: number | null;
   onBack: () => void;
 }
 
-export default function SessionDetail({ session, onBack }: Props) {
-  return <SessionDetailUI session={session} onBack={onBack} />;
+export default function SessionDetail({ sessionId, onBack }: Props) {
+  return (
+    <SessionDetailUI
+      sessionId={sessionId}
+      onBack={onBack}
+    />
+  );
 }
