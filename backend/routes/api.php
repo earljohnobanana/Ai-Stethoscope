@@ -9,6 +9,11 @@ Route::post('/athletes', [PatientController::class, 'store']);
 
 Route::post('/recording/start', [RecordingController::class, 'start']);
 Route::post('/recording/stop',  [RecordingController::class, 'stop']);
+Route::post('/recording/{id}/save', [RecordingController::class, 'save']);
 
 Route::get('/dashboard/{patientId}', [SessionController::class, 'dashboard']);
 Route::get('/history/{patientId}',   [SessionController::class, 'history']);
+Route::get('/sessions/{id}', [SessionController::class, 'show']);
+
+
+
