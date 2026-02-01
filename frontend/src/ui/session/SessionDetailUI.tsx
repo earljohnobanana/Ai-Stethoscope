@@ -71,6 +71,9 @@ function normalizeSession(raw: any): Session {
     String(raw?.summary ?? "").trim() || "No analysis summary available.";
   const aiConfidence = toPercent(raw?.confidence ?? raw?.ai_confidence);
 
+  // Use raw summary if available, otherwise use default
+  const sessionSummary = raw?.summary ?? summary;
+
   if (type === "heart") {
     return {
       id,
@@ -79,10 +82,10 @@ function normalizeSession(raw: any): Session {
       date,
       result: {
         status,
-        heartRate: Number(raw?.heart_rate ?? 0),
+        heartRate: raw?.heart_rate ?? null,
         murmurDetected: Boolean(raw?.murmur_detected),
         aiConfidence,
-        summary,
+        summary: sessionSummary,
       },
     };
   }
@@ -94,11 +97,11 @@ function normalizeSession(raw: any): Session {
     date,
     result: {
       status,
-      respRate: Number(raw?.breathing_rate ?? 0),
-      cracklesDetected: Boolean(raw?.crackles),
-      wheezesDetected: Boolean(raw?.wheezes),
+      respRate: raw?.breathing_rate ?? null,
+      cracklesDetected: Boolean(raw?.crackles_detected),
+      wheezesDetected: Boolean(raw?.wheezes_detected),
       aiConfidence,
-      summary,
+      summary: sessionSummary,
     },
   };
 }

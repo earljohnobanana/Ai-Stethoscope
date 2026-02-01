@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+*.log
+package-lock.json
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Virtual environments
+.venv/
+ai_service/.venv/
+backend/.venv/
+frontend/.venv/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Audio uploads
+backend/storage/app/temp_audio/
+*.wav
+*.mp3
+
+# Screenshots (temporary)
+*.png
+*.jpg
+*.jpeg

@@ -1,6 +1,6 @@
 interface Props {
   status: string;
-  heartRate: number;
+  heartRate: number | null;
   aiConfidence: number;
   summary: string;
 }
@@ -46,7 +46,13 @@ export default function HeartResultPanel({
       >
         <div style={{ fontSize: 14, color: "#6b7280" }}>Heart Rate</div>
         <div style={{ fontSize: 36, fontWeight: 700 }}>
-          {heartRate} <span style={{ fontSize: 18 }}>BPM</span>
+          {heartRate != null ? (
+            <>
+              {heartRate} <span style={{ fontSize: 18 }}>BPM</span>
+            </>
+          ) : (
+            "—"
+          )}
         </div>
       </div>
 

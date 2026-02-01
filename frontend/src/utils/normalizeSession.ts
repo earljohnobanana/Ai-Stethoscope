@@ -30,6 +30,9 @@ export function normalizeSession(raw: any): Session {
   const summary = raw?.summary ?? "No analysis summary available.";
   const aiConfidence = toPercent(raw?.confidence);
 
+  // Use raw summary if available, otherwise use default
+  const sessionSummary = raw?.summary ?? summary;
+
   if (type === "heart") {
     return {
       id,
@@ -38,10 +41,10 @@ export function normalizeSession(raw: any): Session {
       date,
       result: {
         status,
-        heartRate: raw?.heart_rate ?? 0,
+        heartRate: raw?.heart_rate ?? null,
         murmurDetected: Boolean(raw?.murmur_detected),
         aiConfidence,
-        summary,
+        summary: sessionSummary,
       },
     };
   }
@@ -54,11 +57,11 @@ export function normalizeSession(raw: any): Session {
     date,
     result: {
       status,
-      respRate: raw?.breathing_rate ?? 0,
-      cracklesDetected: Boolean(raw?.crackles),
-      wheezesDetected: Boolean(raw?.wheezes),
+      respRate: raw?.breathing_rate ?? null,
+      cracklesDetected: Boolean(raw?.crackles_detected),
+      wheezesDetected: Boolean(raw?.wheezes_detected),
       aiConfidence,
-      summary,
+      summary: sessionSummary,
     },
   };
 }

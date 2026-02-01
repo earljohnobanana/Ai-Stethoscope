@@ -65,7 +65,7 @@ function normalizeSession(raw: any): Session {
   const result: any = {
     status: String(label),
     aiConfidence: ai,
-    summary: raw?.summary ?? null,
+    summary: raw?.summary ?? "No analysis summary available.",
   };
 
   if (type === "heart") {
@@ -73,8 +73,8 @@ function normalizeSession(raw: any): Session {
     result.murmurDetected = Boolean(raw?.murmur_detected);
   } else {
     result.respRate = raw?.breathing_rate ?? null;
-    result.cracklesDetected = Boolean(raw?.crackles);
-    result.wheezesDetected = Boolean(raw?.wheezes);
+    result.cracklesDetected = Boolean(raw?.crackles_detected);
+    result.wheezesDetected = Boolean(raw?.wheezes_detected);
   }
 
   return {
