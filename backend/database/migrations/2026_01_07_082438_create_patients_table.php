@@ -10,8 +10,8 @@ return new class extends Migration {
         Schema::create('patients', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->unsignedInteger('age');
-            $table->string('sport');
+            $table->unsignedInteger('age')->nullable();
+            $table->string('sport')->nullable();
             $table->timestamps();
         });
     }

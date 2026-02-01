@@ -21,7 +21,7 @@ class RecordingController extends Controller
 
         $rec = Recording::create([
             'patient_id' => $data['patient_id'],
-            'mode' => $data['mode'],
+            'mode' => $data['mode'], // 'heart' or 'lung'
             'status' => 'Recording',
             'started_at' => Carbon::now(),
         ]);
@@ -37,6 +37,14 @@ class RecordingController extends Controller
     {
         $data = $request->validate([
             'session_id' => ['required', 'integer', 'exists:recordings,id'],
+            'heart_rate' => ['nullable', 'integer'],
+            'breathing_rate' => ['nullable', 'integer'],
+            'murmur_detected' => ['nullable', 'boolean'],
+            'crackles_detected' => ['nullable', 'boolean'],
+            'wheezes_detected' => ['nullable', 'boolean'],
+            'confidence' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'label' => ['nullable', 'string'],
+            'summary' => ['nullable', 'string'],
         ]);
 
         $rec = Recording::findOrFail($data['session_id']);
@@ -54,16 +62,14 @@ class RecordingController extends Controller
         $started = $rec->started_at ?? $ended;
         $duration = max(1, $ended->diffInSeconds($started));
 
-        // SIMULATED results (deterministic-ish, not required for routing)
-        $heart      = rand(60, 160);
-        $breath     = rand(12, 28);
-
-        $murmur     = rand(1, 10) <= 2;
-        $crackles   = rand(1, 10) <= 2;
-        $wheezes    = rand(1, 10) <= 2;
-        $confidence = round(rand(900, 990) / 1000, 3);
-
-        $label = ($murmur || $crackles || $wheezes) ? 'Warning' : 'Normal';
+        // Use provided values or fallback to simulated results
+        $heart = $data['heart_rate'] ?? rand(60, 160);
+        $breath = $data['breathing_rate'] ?? rand(12, 28);
+        $murmur = $data['murmur_detected'] ?? (rand(1, 10) <= 2);
+        $crackles = $data['crackles_detected'] ?? (rand(1, 10) <= 2);
+        $wheezes = $data['wheezes_detected'] ?? (rand(1, 10) <= 2);
+        $confidence = $data['confidence'] ?? round(rand(900, 990) / 1000, 3);
+        $label = $data['label'] ?? (($murmur || $crackles || $wheezes) ? 'Warning' : 'Normal');
 
         $rec->update([
             'status'           => 'Completed',
@@ -76,6 +82,7 @@ class RecordingController extends Controller
             'wheezes_detected' => $wheezes,
             'confidence'       => $confidence,
             'label'            => $label,
+            'summary'          => $data['summary'] ?? null,
         ]);
 
         return response()->json([

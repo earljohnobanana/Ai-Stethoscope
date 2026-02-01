@@ -3,30 +3,57 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Patient;
 use Illuminate\Http\Request;
+use App\Models\Patient;
 
 class PatientController extends Controller
 {
+    // POST /api/athletes
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'name'  => ['required', 'string', 'max:255'],
-            'age'   => ['required', 'integer', 'min:1', 'max:120'],
-            'sport' => ['required', 'string', 'max:255'],
+        // ✅ Only require name now
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
         ]);
 
         $patient = Patient::create([
-            'name'  => $data['name'],
-            'age'   => $data['age'],
-            'sport' => $data['sport'],
+            'name' => $validated['name'] ?? 'Guest',
         ]);
 
         return response()->json([
             'id' => $patient->id,
-            'name' => $patient->name,
-            'age' => $patient->age,
-            'sport' => $patient->sport,
+            'patient' => $patient,
         ], 201);
+    }
+
+    // GET /api/athletes/{id}
+    public function show($id)
+    {
+        $patient = Patient::find($id);
+        if (!$patient) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        return response()->json($patient);
+    }
+
+    // PUT /api/athletes/{id}
+    public function update(Request $request, $id)
+    {
+        $patient = Patient::find($id);
+        if (!$patient) {
+            return response()->json(['message' => 'Not found'], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'age' => ['nullable', 'integer', 'min:0', 'max:120'],
+            'sex' => ['nullable', 'string', 'in:male,female'],
+            'sport' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $patient->update($validated);
+
+        return response()->json($patient);
     }
 }

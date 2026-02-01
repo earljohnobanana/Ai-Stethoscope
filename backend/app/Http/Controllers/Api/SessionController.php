@@ -14,6 +14,7 @@ class SessionController extends Controller
             ->get([
                 'id',
                 'patient_id',
+                'mode',
                 'recording_name',
                 'status',
                 'started_at',
@@ -26,6 +27,7 @@ class SessionController extends Controller
                 'wheezes_detected',
                 'confidence',
                 'label',
+                'summary',
                 'created_at',
             ]);
 

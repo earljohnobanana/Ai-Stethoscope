@@ -8,6 +8,7 @@ class Recording extends Model
 {
     protected $fillable = [
         'patient_id',
+        'mode',
         'status',
         'started_at',
         'ended_at',
@@ -18,6 +19,7 @@ class Recording extends Model
         'crackles_detected',
         'wheezes_detected',
         'confidence',
+        'summary',
     ];
 
     protected $casts = [
