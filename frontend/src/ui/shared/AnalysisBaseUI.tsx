@@ -1,27 +1,33 @@
 import { useEffect, useRef, useState } from "react";
+import type { ComponentType } from "react";
 import Screen from "../../components/Screen";
 
 import { startRecording, stopRecording } from "../../services/recording.service";
 import { saveRecordingName } from "../../services/session.service";
 import { ensureActivePatient, updatePatient } from "../../services/patient.service";
 
+// ✅ Mic recorder
+import { startMicWavRecorder, type MicRecorderSession } from "../../services/micWavRecorder";
+
 interface Props {
   onBack: () => void;
   title: string;
   subtitle: string;
-  HeaderComponent: React.ComponentType<{ title: string; subtitle: string; onBack: () => void }>;
-  StatesComponent: React.ComponentType<{
+
+  HeaderComponent: ComponentType<{ title: string; subtitle: string; onBack: () => void }>;
+  StatesComponent: ComponentType<{
     isAnalyzing: boolean;
     onStart: () => void;
     onStop: () => void;
   }>;
-  ResultComponent: React.ComponentType<any>;
-  SaveComponent: React.ComponentType<{
+  ResultComponent: ComponentType<any>;
+  SaveComponent: ComponentType<{
     name: string;
     setName: (v: string) => void;
     onConfirm: (payload: { name: string; age?: number; sex?: string; sport?: string }) => void;
     onCancel: () => void;
   }>;
+
   inferFunction: (file: File) => Promise<any>;
   processResult: (apiResult: any) => any;
   testWavButtonText: string;
@@ -48,7 +54,11 @@ export default function AnalysisBaseUI({
   const [result, setResult] = useState<any | null>(null);
   const [showSave, setShowSave] = useState(false);
   const [recordingName, setRecordingName] = useState("");
+
   const wavPickerRef = useRef<HTMLInputElement | null>(null);
+
+  // ✅ mic session
+  const [micSession, setMicSession] = useState<MicRecorderSession | null>(null);
 
   // Initialize patient
   useEffect(() => {
@@ -62,6 +72,8 @@ export default function AnalysisBaseUI({
 
   async function handleStart() {
     if (busy) return;
+
+    let localMic: MicRecorderSession | null = null;
 
     try {
       setBusy(true);
@@ -87,8 +99,19 @@ export default function AnalysisBaseUI({
         setRecordingId(Number(id));
       }
 
+      // ✅ Start mic capture @16k
+      localMic = await startMicWavRecorder(16000);
+      setMicSession(localMic);
+
       setIsAnalyzing(true);
     } catch (e: any) {
+      console.error(e);
+      // cancel mic if it started
+      try {
+        localMic?.cancel();
+      } catch {}
+      setMicSession(null);
+
       alert(e?.message ?? `Failed to start ${mode} recording.`);
     } finally {
       setBusy(false);
@@ -101,13 +124,58 @@ export default function AnalysisBaseUI({
     try {
       setBusy(true);
 
+      // ✅ Stop mic -> WAV file
+      if (!micSession) {
+        alert("No microphone session active. Please press Start first.");
+        return;
+      }
+
+      const wavBlob = await micSession.stop();
+      setMicSession(null);
+
+      const wavFile = new File([wavBlob], `${mode}_${Date.now()}.wav`, { type: "audio/wav" });
+
+      // Run AI
+      const ai = await inferFunction(wavFile);
+      const processedResult = processResult(ai);
+      setResult(processedResult);
+
+      // Stop recording & store AI fields in backend
       if (recordingId != null) {
-        await stopRecording(recordingId);
+        const stopData: any = {};
+
+        if (mode === "heart") {
+          stopData.heart_rate = ai?.bpm ?? null;
+          stopData.murmur_detected = Boolean(ai?.murmur_detected);
+          stopData.confidence = (Number(ai?.ai_confidence_pct ?? 0) || 0) / 100; // 0-1
+          stopData.label = Boolean(ai?.murmur_detected) ? "Warning" : "Normal";
+          stopData.summary = processedResult?.summary ?? null;
+        } else {
+          stopData.breathing_rate = ai?.resp_rate ?? null;
+          stopData.crackles_detected = Boolean(ai?.crackle_detected);
+          stopData.wheezes_detected = Boolean(ai?.wheeze_detected);
+          stopData.confidence = (Number(ai?.ai_confidence_pct ?? 0) || 0) / 100; // 0-1
+          stopData.label =
+            Boolean(ai?.crackle_detected) || Boolean(ai?.wheeze_detected) ? "Warning" : "Normal";
+          stopData.summary = processedResult?.summary ?? null;
+        }
+
+        await stopRecording(recordingId, stopData);
+      } else {
+        console.warn("No recordingId when stopping; AI result shown but not saved to backend.");
       }
 
       setIsAnalyzing(false);
     } catch (e: any) {
+      console.error(e);
       alert(e?.message ?? `Failed to stop ${mode} recording.`);
+      setIsAnalyzing(false);
+
+      // ensure mic is killed
+      try {
+        micSession?.cancel();
+      } catch {}
+      setMicSession(null);
     } finally {
       setBusy(false);
     }
@@ -123,10 +191,16 @@ export default function AnalysisBaseUI({
       // Create a recording entry when testing WAV file
       const pid = await ensureActivePatient();
       setPatientId(pid);
-      
+
       const res: any = await startRecording(pid, mode);
-      const id = res?.recording_id ?? res?.recordingId ?? res?.session_id ?? res?.sessionId ?? res?.id ?? null;
-      
+      const id =
+        res?.recording_id ??
+        res?.recordingId ??
+        res?.session_id ??
+        res?.sessionId ??
+        res?.id ??
+        null;
+
       if (id != null) {
         setRecordingId(Number(id));
       }
@@ -138,20 +212,21 @@ export default function AnalysisBaseUI({
       // Stop the recording after AI processing and pass AI results
       if (id != null) {
         const stopData: any = {};
-        
-        if (mode === 'heart') {
-          stopData.heart_rate = ai.bpm;
-          stopData.murmur_detected = ai.murmur_detected;
-          stopData.confidence = ai.ai_confidence_pct / 100; // convert to 0-1 range
-          stopData.label = ai.murmur_detected ? 'Warning' : 'Normal';
-          stopData.summary = processedResult.summary; // Include summary
+
+        if (mode === "heart") {
+          stopData.heart_rate = ai?.bpm ?? null;
+          stopData.murmur_detected = Boolean(ai?.murmur_detected);
+          stopData.confidence = (Number(ai?.ai_confidence_pct ?? 0) || 0) / 100;
+          stopData.label = Boolean(ai?.murmur_detected) ? "Warning" : "Normal";
+          stopData.summary = processedResult?.summary ?? null;
         } else {
-          stopData.breathing_rate = ai.resp_rate;
-          stopData.crackles_detected = ai.crackle_detected;
-          stopData.wheezes_detected = ai.wheeze_detected;
-          stopData.confidence = ai.ai_confidence_pct / 100; // convert to 0-1 range
-          stopData.label = (ai.crackle_detected || ai.wheeze_detected) ? 'Warning' : 'Normal';
-          stopData.summary = processedResult.summary; // Include summary
+          stopData.breathing_rate = ai?.resp_rate ?? null;
+          stopData.crackles_detected = Boolean(ai?.crackle_detected);
+          stopData.wheezes_detected = Boolean(ai?.wheeze_detected);
+          stopData.confidence = (Number(ai?.ai_confidence_pct ?? 0) || 0) / 100;
+          stopData.label =
+            Boolean(ai?.crackle_detected) || Boolean(ai?.wheeze_detected) ? "Warning" : "Normal";
+          stopData.summary = processedResult?.summary ?? null;
         }
 
         await stopRecording(id, stopData);
@@ -181,7 +256,7 @@ export default function AnalysisBaseUI({
     try {
       setBusy(true);
       await saveRecordingName(recordingId, name);
-      
+
       // Update patient details if provided
       if (patientId && (payload.age !== undefined || payload.sex || payload.sport)) {
         try {
@@ -192,7 +267,6 @@ export default function AnalysisBaseUI({
           });
         } catch (e: any) {
           console.warn("Failed to update patient details:", e);
-          // Continue saving even if patient update fails
         }
       }
 
@@ -339,11 +413,11 @@ export default function AnalysisBaseUI({
                 <div style={{ fontSize: 14, color: "#64748b", marginBottom: 8, fontWeight: 700 }}>
                   Recording Result
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 900, color: "#0f172a" }}>
-                  No result yet
-                </div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: "#0f172a" }}>No result yet</div>
                 <div style={{ marginTop: 10, fontSize: 14, color: "#334155", lineHeight: 1.5 }}>
-                  Click <b>{testWavButtonText}</b> and choose a <b>.wav</b> file to see the AI output here.
+                  Click <b>Start</b> to record from the microphone, then <b>Stop</b> to run AI.
+                  <br />
+                  Or click <b>{testWavButtonText}</b> to upload a WAV file.
                 </div>
               </div>
             )}
