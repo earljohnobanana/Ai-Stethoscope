@@ -2,12 +2,15 @@ interface Props {
   isAnalyzing: boolean;
   onStart: () => void;
   onStop: () => void;
+  elapsedTime?: number;
+  formattedTime?: string;
 }
 
 export default function HeartStates({
   isAnalyzing,
   onStart,
   onStop,
+  formattedTime,
 }: Props) {
   return (
     <div
@@ -17,6 +20,7 @@ export default function HeartStates({
         backgroundColor: isAnalyzing ? "#b00020" : "#007cbfff", // 👈 Background COLOR HERE
         color: "#ffffff", // 👈 Font COLOR HERE
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         fontSize: 28,
@@ -26,6 +30,11 @@ export default function HeartStates({
       onClick={isAnalyzing ? onStop : onStart}
     >
       {isAnalyzing ? "Stop Analysis" : "Start Analysis"}
+      {isAnalyzing && formattedTime && (
+        <div style={{ fontSize: 20, marginTop: 8, opacity: 0.9 }}>
+          {formattedTime}
+        </div>
+      )}
     </div>
   );
 }

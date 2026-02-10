@@ -14,6 +14,8 @@ interface Props {
     isAnalyzing: boolean;
     onStart: () => void;
     onStop: () => void;
+    elapsedTime?: number;
+    formattedTime?: string;
   }>;
   ResultComponent: React.ComponentType<any>;
   SaveComponent: React.ComponentType<{
@@ -48,7 +50,9 @@ export default function AnalysisBaseUI({
   const [result, setResult] = useState<any | null>(null);
   const [showSave, setShowSave] = useState(false);
   const [recordingName, setRecordingName] = useState("");
+  const [elapsedTime, setElapsedTime] = useState(0);
   const wavPickerRef = useRef<HTMLInputElement | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   // Initialize patient
   useEffect(() => {
@@ -59,6 +63,43 @@ export default function AnalysisBaseUI({
         alert(e?.message ?? "Failed to initialize patient.");
       });
   }, []);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      stopTimer();
+    };
+  }, []);
+
+  // Format time as MM:SS
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Start timer
+  const startTimer = () => {
+    setElapsedTime(0);
+    timerRef.current = window.setInterval(() => {
+      setElapsedTime(prev => {
+        const newTime = prev + 1;
+        // Auto-stop after 20 seconds
+        if (newTime >= 20) {
+          handleStop();
+        }
+        return newTime;
+      });
+    }, 1000);
+  };
+
+  // Stop timer
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
   async function handleStart() {
     if (busy) return;
@@ -88,6 +129,7 @@ export default function AnalysisBaseUI({
       }
 
       setIsAnalyzing(true);
+      startTimer();
     } catch (e: any) {
       alert(e?.message ?? `Failed to start ${mode} recording.`);
     } finally {
@@ -106,6 +148,7 @@ export default function AnalysisBaseUI({
       }
 
       setIsAnalyzing(false);
+      stopTimer();
     } catch (e: any) {
       alert(e?.message ?? `Failed to stop ${mode} recording.`);
     } finally {
@@ -130,6 +173,10 @@ export default function AnalysisBaseUI({
       if (id != null) {
         setRecordingId(Number(id));
       }
+
+      // Start timer for WAV file testing
+      setIsAnalyzing(true);
+      startTimer();
 
       const ai = await inferFunction(file);
       const processedResult = processResult(ai);
@@ -156,6 +203,10 @@ export default function AnalysisBaseUI({
 
         await stopRecording(id, stopData);
       }
+
+      // Stop timer after AI processing
+      setIsAnalyzing(false);
+      stopTimer();
     } catch (e: any) {
       console.error(e);
       alert(e?.message ?? `Failed to run ${mode} AI.`);
@@ -262,7 +313,13 @@ export default function AnalysisBaseUI({
             }}
           >
             {/* Start/Stop */}
-            <StatesComponent isAnalyzing={isAnalyzing} onStart={handleStart} onStop={handleStop} />
+            <StatesComponent 
+              isAnalyzing={isAnalyzing} 
+              onStart={handleStart} 
+              onStop={handleStop}
+              elapsedTime={elapsedTime}
+              formattedTime={formatTime(elapsedTime)}
+            />
 
             {/* Test WAV */}
             <button
