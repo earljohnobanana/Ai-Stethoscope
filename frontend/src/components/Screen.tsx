@@ -1,9 +1,28 @@
+import { useState, useEffect } from 'react';
+
 interface Props {
   title?: string;
   children: React.ReactNode;
 }
 
 export default function Screen({ title, children }: Props) {
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   return (
     <div
       style={{
@@ -12,13 +31,17 @@ export default function Screen({ title, children }: Props) {
         display: "flex",
         justifyContent: "center",
         background: "#f5f7fa",
+        padding: 8,
+        boxSizing: "border-box",
       }}
     >
       {/* LCD FRAME */}
       <div
         style={{
-          width: 800,
-          height: 480,
+          width: "100%",
+          maxWidth: windowSize.width <= 600 ? "100%" : 800,
+          height: "100%",
+          maxHeight: windowSize.width <= 600 ? "100%" : 480,
           background: "#ffffff",
           borderRadius: 16,
           overflow: "hidden",

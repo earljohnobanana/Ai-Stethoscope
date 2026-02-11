@@ -50,7 +50,7 @@ class AiService
 
         try {
             /** @var Response $response */
-            $response = Http::timeout(90)
+            $response = Http::timeout(300)
                 ->asMultipart()
                 ->attach(
                     // IMPORTANT: FastAPI expects UploadFile param named "file"

@@ -8,6 +8,7 @@ import os
 import traceback
 
 from runtime.tflite_runner import TFLiteRunner
+from runtime.audio_preprocessing import preprocess_audio
 
 app = FastAPI(title="AI Stethoscope Inference Service")
 
@@ -192,7 +193,16 @@ async def infer_heart(file: UploadFile = File(...)):
             tmp.write(await file.read())
             tmp_path = tmp.name
 
+        # Load and preprocess audio
         y = load_wav_mono_16k(tmp_path)
+        
+        # Apply audio preprocessing (band-pass + notch + denoise)
+        y = preprocess_audio(y, SAMPLE_RATE, mode="heart")
+
+        # Limit audio duration to 10 seconds to improve performance
+        max_samples = SAMPLE_RATE * 10  # 10 seconds
+        if len(y) > max_samples:
+            y = y[:max_samples]
 
         bpm = estimate_bpm(y)
 
@@ -232,7 +242,16 @@ async def infer_lung(file: UploadFile = File(...)):
             tmp.write(await file.read())
             tmp_path = tmp.name
 
+        # Load and preprocess audio
         y = load_wav_mono_16k(tmp_path)
+        
+        # Apply audio preprocessing (band-pass + notch + denoise)
+        y = preprocess_audio(y, SAMPLE_RATE, mode="lung")
+
+        # Limit audio duration to 10 seconds to improve performance
+        max_samples = SAMPLE_RATE * 10  # 10 seconds
+        if len(y) > max_samples:
+            y = y[:max_samples]
 
         resp_rate = estimate_respiratory_rate(y)
 
@@ -262,3 +281,10 @@ async def infer_lung(file: UploadFile = File(...)):
                 os.remove(tmp_path)
             except:
                 pass
+  
+# -------------------------  
+# Run server  
+# -------------------------  
+if __name__ == "__main__":  
+    import uvicorn  
+    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info") 

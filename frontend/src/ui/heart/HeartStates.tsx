@@ -13,9 +13,10 @@ export default function HeartStates({
   formattedTime,
 }: Props) {
   return (
-    <div
+    <button
       style={{
         height: 160,
+        width: "100%",
         borderRadius: 20,
         backgroundColor: isAnalyzing ? "#b00020" : "#007cbfff", // 👈 Background COLOR HERE
         color: "#ffffff", // 👈 Font COLOR HERE
@@ -26,6 +27,8 @@ export default function HeartStates({
         fontSize: 28,
         fontWeight: 600,
         cursor: "pointer",
+        border: "none",
+        outline: "none",
       }}
       onClick={isAnalyzing ? onStop : onStart}
     >
@@ -35,6 +38,6 @@ export default function HeartStates({
           {formattedTime}
         </div>
       )}
-    </div>
+    </button>
   );
 }

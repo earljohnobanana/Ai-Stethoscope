@@ -56,13 +56,27 @@ export default function AnalysisBaseUI({
   const [result, setResult] = useState<any | null>(null);
   const [showSave, setShowSave] = useState(false);
   const [recordingName, setRecordingName] = useState("");
-<<<<<<< HEAD
   const [elapsedTime, setElapsedTime] = useState(0);
-=======
 
->>>>>>> 985f5ce6d7f6d240eb16c70afb2a46e16026c058
   const wavPickerRef = useRef<HTMLInputElement | null>(null);
   const timerRef = useRef<number | null>(null);
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ✅ mic session
   const [micSession, setMicSession] = useState<MicRecorderSession | null>(null);
@@ -117,7 +131,7 @@ export default function AnalysisBaseUI({
   async function handleStart() {
     if (busy) return;
 
-    let localMic: MicRecorderSession | null = null;
+    let localMic: any = null;
 
     try {
       setBusy(true);
@@ -126,26 +140,32 @@ export default function AnalysisBaseUI({
       const pid = await ensureActivePatient();
       setPatientId(pid);
 
-      const res: any = await startRecording(pid, mode);
-
-      const id =
-        res?.recording_id ??
-        res?.recordingId ??
-        res?.session_id ??
-        res?.sessionId ??
-        res?.id ??
-        null;
-
-      if (id == null) {
-        console.warn("startRecording() response:", res);
-        alert("Recording started but backend did not return a recording id.");
-      } else {
-        setRecordingId(Number(id));
+      // ✅ Try to start backend recording, but continue even if it fails
+      try {
+        const res: any = await startRecording(pid, mode);
+        const id =
+          res?.recording_id ??
+          res?.recordingId ??
+          res?.session_id ??
+          res?.sessionId ??
+          res?.id ??
+          null;
+        if (id != null) {
+          setRecordingId(Number(id));
+        }
+      } catch (recordingError: any) {
+        console.warn("Failed to start backend recording:", recordingError);
+        // Continue without backend recording
       }
 
-      // ✅ Start mic capture @16k
-      localMic = await startMicWavRecorder(16000);
-      setMicSession(localMic);
+      // ✅ Try to start mic capture, but continue even if it fails
+      try {
+        localMic = await startMicWavRecorder(16000);
+        setMicSession(localMic);
+      } catch (micError: any) {
+        console.warn("Failed to start microphone:", micError);
+        // Continue without mic - allow analysis to proceed
+      }
 
       setIsAnalyzing(true);
       startTimer();
@@ -157,7 +177,8 @@ export default function AnalysisBaseUI({
       } catch {}
       setMicSession(null);
 
-      alert(e?.message ?? `Failed to start ${mode} recording.`);
+      // Don't block analysis if API fails - just log the error
+      console.error(`Failed to start ${mode} recording:`, e);
     } finally {
       setBusy(false);
     }
@@ -166,56 +187,72 @@ export default function AnalysisBaseUI({
   async function handleStop() {
     if (busy) return;
 
+    // Stop timer immediately when button is clicked
+    stopTimer();
+    setIsAnalyzing(false);
+
     try {
       setBusy(true);
 
-      // ✅ Stop mic -> WAV file
-      if (!micSession) {
-        alert("No microphone session active. Please press Start first.");
-        return;
-      }
+      // ✅ Stop mic if active
+      if (micSession) {
+        try {
+          const wavBlob = await micSession.stop();
+          setMicSession(null);
 
-      const wavBlob = await micSession.stop();
-      setMicSession(null);
+          const wavFile = new File([wavBlob], `${mode}_${Date.now()}.wav`, { type: "audio/wav" });
 
-      const wavFile = new File([wavBlob], `${mode}_${Date.now()}.wav`, { type: "audio/wav" });
+          // Run AI
+          const ai = await inferFunction(wavFile);
+          const processedResult = processResult(ai);
+          setResult(processedResult);
 
-      // Run AI
-      const ai = await inferFunction(wavFile);
-      const processedResult = processResult(ai);
-      setResult(processedResult);
+          // Stop recording & store AI fields in backend
+          if (recordingId != null) {
+            const stopData: any = {};
 
-      // Stop recording & store AI fields in backend
-      if (recordingId != null) {
-        const stopData: any = {};
+            if (mode === "heart") {
+              stopData.heart_rate = ai?.bpm ?? null;
+              stopData.murmur_detected = Boolean(ai?.murmur_detected);
+              stopData.confidence = (Number(ai?.ai_confidence_pct ?? 0) || 0) / 100; // 0-1
+              stopData.label = Boolean(ai?.murmur_detected) ? "Warning" : "Normal";
+              stopData.summary = processedResult?.summary ?? null;
+            } else {
+              stopData.breathing_rate = ai?.resp_rate ?? null;
+              stopData.crackles_detected = Boolean(ai?.crackle_detected);
+              stopData.wheezes_detected = Boolean(ai?.wheeze_detected);
+              stopData.confidence = (Number(ai?.ai_confidence_pct ?? 0) || 0) / 100; // 0-1
+              stopData.label =
+                Boolean(ai?.crackle_detected) || Boolean(ai?.wheeze_detected) ? "Warning" : "Normal";
+              stopData.summary = processedResult?.summary ?? null;
+            }
 
-        if (mode === "heart") {
-          stopData.heart_rate = ai?.bpm ?? null;
-          stopData.murmur_detected = Boolean(ai?.murmur_detected);
-          stopData.confidence = (Number(ai?.ai_confidence_pct ?? 0) || 0) / 100; // 0-1
-          stopData.label = Boolean(ai?.murmur_detected) ? "Warning" : "Normal";
-          stopData.summary = processedResult?.summary ?? null;
-        } else {
-          stopData.breathing_rate = ai?.resp_rate ?? null;
-          stopData.crackles_detected = Boolean(ai?.crackle_detected);
-          stopData.wheezes_detected = Boolean(ai?.wheeze_detected);
-          stopData.confidence = (Number(ai?.ai_confidence_pct ?? 0) || 0) / 100; // 0-1
-          stopData.label =
-            Boolean(ai?.crackle_detected) || Boolean(ai?.wheeze_detected) ? "Warning" : "Normal";
-          stopData.summary = processedResult?.summary ?? null;
+            try {
+              await stopRecording(recordingId, stopData);
+            } catch (stopError: any) {
+              console.warn("Failed to stop backend recording:", stopError);
+              // Continue with showing results even if backend fails
+            }
+          } else {
+            console.warn("No recordingId when stopping; AI result shown but not saved to backend.");
+          }
+        } catch (micError: any) {
+          console.warn("Error stopping microphone:", micError);
         }
-
-        await stopRecording(recordingId, stopData);
       } else {
-        console.warn("No recordingId when stopping; AI result shown but not saved to backend.");
+        // If no mic session, just stop the recording
+        if (recordingId != null) {
+          try {
+            await stopRecording(recordingId);
+          } catch (stopError: any) {
+            console.warn("Failed to stop backend recording:", stopError);
+          }
+        }
       }
-
-      setIsAnalyzing(false);
-      stopTimer();
     } catch (e: any) {
       console.error(e);
-      alert(e?.message ?? `Failed to stop ${mode} recording.`);
-      setIsAnalyzing(false);
+      // Don't show alert - just log the error to avoid blocking user
+      console.error(`Failed to stop ${mode} recording:`, e);
 
       // ensure mic is killed
       try {
@@ -234,32 +271,34 @@ export default function AnalysisBaseUI({
       setBusy(true);
       setResult(null);
 
-      // Create a recording entry when testing WAV file
+      // Create a recording entry when testing WAV file (but continue if it fails)
       const pid = await ensureActivePatient();
       setPatientId(pid);
 
-      const res: any = await startRecording(pid, mode);
-      const id =
-        res?.recording_id ??
-        res?.recordingId ??
-        res?.session_id ??
-        res?.sessionId ??
-        res?.id ??
-        null;
-
-      if (id != null) {
-        setRecordingId(Number(id));
+      let id: number | null = null;
+      try {
+        const res: any = await startRecording(pid, mode);
+        id =
+          res?.recording_id ??
+          res?.recordingId ??
+          res?.session_id ??
+          res?.sessionId ??
+          res?.id ??
+          null;
+        if (id != null) {
+          setRecordingId(Number(id));
+        }
+      } catch (recordingError: any) {
+        console.warn("Failed to start backend recording for WAV test:", recordingError);
+        // Continue with AI analysis without backend recording
       }
 
-      // Start timer for WAV file testing
-      setIsAnalyzing(true);
-      startTimer();
-
+      // Run AI analysis without timer for WAV test
       const ai = await inferFunction(file);
       const processedResult = processResult(ai);
       setResult(processedResult);
 
-      // Stop the recording after AI processing and pass AI results
+      // Stop the recording after AI processing and pass AI results (if recording started)
       if (id != null) {
         const stopData: any = {};
 
@@ -279,15 +318,20 @@ export default function AnalysisBaseUI({
           stopData.summary = processedResult?.summary ?? null;
         }
 
-        await stopRecording(id, stopData);
+        try {
+          await stopRecording(id, stopData);
+        } catch (stopError: any) {
+          console.warn("Failed to stop backend recording for WAV test:", stopError);
+          // Continue with showing results even if backend fails
+        }
       }
-
-      // Stop timer after AI processing
-      setIsAnalyzing(false);
-      stopTimer();
     } catch (e: any) {
-      console.error(e);
-      alert(e?.message ?? `Failed to run ${mode} AI.`);
+      console.error('=== Error running WAV file analysis ===');
+      console.error('Error object:', e);
+      console.error('Error message:', e?.message);
+      console.error('Error stack:', e?.stack);
+      // Don't show alert - just log the error to avoid blocking user
+      console.error(`Failed to run ${mode} AI on WAV file:`, e);
     } finally {
       setBusy(false);
     }
@@ -369,12 +413,12 @@ export default function AnalysisBaseUI({
         {/* Header */}
         <HeaderComponent title={title} subtitle={subtitle} onBack={onBack} />
 
-        {/* Main grid (left controls, right result) */}
+        {/* Main grid (left controls, right result) - responsive */}
         <div
           style={{
             flex: 1,
             display: "grid",
-            gridTemplateColumns: "1fr 1.2fr",
+            gridTemplateColumns: windowSize.width <= 600 ? "1fr" : "1fr 1.2fr",
             gap: 16,
             marginTop: 16,
             minHeight: 0,

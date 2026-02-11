@@ -9,7 +9,7 @@ import SessionDetail from "../screens/SessionDetail";
 type Screen = "home" | "heart" | "lung" | "history" | "detail";
 
 export default function RootNavigator() {
-  const [screen, setScreen] = useState<Screen>("home");
+  const [screen, setScreen] = useState<Screen>("heart");
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
 
   if (screen === "home") {

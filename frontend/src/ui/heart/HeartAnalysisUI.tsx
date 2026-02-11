@@ -22,26 +22,23 @@ function processHeartResult(ai: any): HeartUIResult {
   const heartRate = ai?.bpm;
   const confidence = typeof ai?.ai_confidence_pct === "number" ? ai.ai_confidence_pct : 0;
 
-  // Generate detailed summary with prescription
+  // Generate simple, readable summary for UI display
   let summary = "";
+  
   if (murmurDetected) {
     summary = "Possible murmur detected. This may indicate heart valve abnormalities. ";
-    if (heartRate) {
-      if (heartRate < 60) {
-        summary += `Heart rate is ${heartRate} BPM (bradycardia). `;
-      } else if (heartRate > 100) {
-        summary += `Heart rate is ${heartRate} BPM (tachycardia). `;
-      }
+    if (heartRate && heartRate < 60) {
+      summary += `Heart rate is ${heartRate} BPM (bradycardia). `;
+    } else if (heartRate && heartRate > 100) {
+      summary += `Heart rate is ${heartRate} BPM (tachycardia). `;
     }
     summary += "We recommend consulting a cardiologist for further evaluation and possible echocardiogram.";
+  } else if (heartRate && heartRate < 60) {
+    summary = `Heart rate is ${heartRate} BPM (bradycardia). If you experience dizziness or fatigue, consult a healthcare professional.`;
+  } else if (heartRate && heartRate > 100) {
+    summary = `Heart rate is ${heartRate} BPM (tachycardia). If you experience shortness of breath or chest pain, seek medical attention.`;
   } else if (heartRate) {
-    if (heartRate < 60) {
-      summary = `Heart rate is ${heartRate} BPM (bradycardia). If you experience dizziness or fatigue, consult a healthcare professional.`;
-    } else if (heartRate > 100) {
-      summary = `Heart rate is ${heartRate} BPM (tachycardia). If you experience shortness of breath or chest pain, seek medical attention.`;
-    } else {
-      summary = "Heart analysis shows normal results. No murmur detected. Heart rate is within normal range (60-100 BPM).";
-    }
+    summary = "Heart analysis shows normal results. No murmur detected. Heart rate is within normal range (60-100 BPM).";
   } else {
     summary = "Heart analysis completed. No murmur detected. Unable to estimate heart rate.";
   }
