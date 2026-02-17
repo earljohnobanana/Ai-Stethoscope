@@ -2,10 +2,12 @@ export default function SessionMetric({
   label,
   value,
   unit,
+  style,
 }: {
   label: string;
   value: any;
   unit?: string;
+  style?: React.CSSProperties;
 }) {
   const displayValue = value == null || value === "" ? "—" : value;
   
@@ -18,7 +20,7 @@ export default function SessionMetric({
       }}
     >
       <div style={{ fontSize: 12, color: "#64748b" }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 600 }}>
+      <div style={{ fontSize: 20, fontWeight: 600, ...style }}>
         {displayValue} {unit}
       </div>
     </div>

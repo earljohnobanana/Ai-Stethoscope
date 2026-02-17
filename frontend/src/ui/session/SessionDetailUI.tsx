@@ -3,6 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import Screen from "../../components/Screen";
 import { getSession } from "../../services/session.service";
 import type { Session } from "../../models/Session";
+import ThresholdBands from "../shared/ThresholdBands";
+import { 
+  getHeartRateRiskLevel, 
+  getRespRateRiskLevel, 
+  getRiskLevelConfig, 
+  getRiskLevelIndicator 
+} from "../../utils/riskLevel";
 
 /* ---------------- helpers ---------------- */
 
@@ -84,8 +91,11 @@ function normalizeSession(raw: any): Session {
         status,
         heartRate: raw?.heart_rate ?? null,
         murmurDetected: Boolean(raw?.murmur_detected),
+        murmurSeverity: raw?.murmur_severity ?? "Moderate Intensity",
+        murmurPattern: raw?.murmur_pattern ?? "Not classified",
         aiConfidence,
         summary: sessionSummary,
+        duration: raw?.duration ?? 30,
       },
     };
   }
@@ -100,8 +110,10 @@ function normalizeSession(raw: any): Session {
       respRate: raw?.breathing_rate ?? null,
       cracklesDetected: Boolean(raw?.crackles_detected),
       wheezesDetected: Boolean(raw?.wheezes_detected),
+      crackleType: raw?.crackle_type ?? "Not classified",
       aiConfidence,
       summary: sessionSummary,
+      duration: raw?.duration ?? 30,
     },
   };
 }
@@ -160,6 +172,22 @@ export default function SessionDetailUI({ sessionId, onBack }: Props) {
     if (!session) return "🫁";
     return session.type === "heart" ? "❤️" : "🫁";
   }, [session]);
+
+  const riskLevel = useMemo(() => {
+    if (!session) return "green";
+    if (session.type === "heart" && session.result.heartRate != null) {
+      return getHeartRateRiskLevel(session.result.heartRate);
+    } else if (session.type === "lung" && session.result.respRate != null) {
+      return getRespRateRiskLevel(session.result.respRate);
+    }
+    return "green";
+  }, [session]);
+
+
+
+  const riskConfig = useMemo(() => {
+    return getRiskLevelConfig(riskLevel);
+  }, [riskLevel]);
 
   return (
     <Screen>
@@ -292,48 +320,67 @@ export default function SessionDetailUI({ sessionId, onBack }: Props) {
                 alignItems: "start",
               }}
             >
-              {/* LEFT: SUMMARY CARD */}
-              <div
-                style={{
-                  background: "#fff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 20,
-                  padding: 18,
-                  boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    marginBottom: 10,
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>
-                      {session.type === "heart" ? "Heart Analysis" : "Lung Analysis"}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#94a3b8" }}>
-                      {formatDate(session.date)}
-                    </div>
-                  </div>
-
+                  {/* LEFT: SUMMARY CARD */}
                   <div
                     style={{
-                      padding: "6px 10px",
-                      borderRadius: 999,
-                      border: "1px solid #d1fae5",
-                      background: "#ecfdf5",
-                      color: "#065f46",
-                      fontSize: 12,
-                      fontWeight: 800,
-                      height: "fit-content",
+                      background: "#fff",
+                      border: `1px solid ${riskConfig.borderColor}`,
+                      borderRadius: 20,
+                      padding: 18,
+                      boxShadow: "0 10px 25px rgba(0,0,0,0.06)",
                     }}
                   >
-                    Status: {session.result.status}
-                  </div>
-                </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          {session.type === "heart" ? "Heart Analysis" : "Lung Analysis"}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                          {formatDate(session.date)}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <div
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            border: "1px solid #d1fae5",
+                            background: "#ecfdf5",
+                            color: "#065f46",
+                            fontSize: 12,
+                            fontWeight: 800,
+                            height: "fit-content",
+                          }}
+                        >
+                          Status: {session.result.status}
+                        </div>
+                        <div
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            border: `1px solid ${riskConfig.borderColor}`,
+                            background: riskConfig.bgColor,
+                            color: riskConfig.textColor,
+                            fontSize: 12,
+                            fontWeight: 800,
+                            height: "fit-content",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4
+                          }}
+                        >
+                          {getRiskLevelIndicator(riskLevel)} {riskConfig.label}
+                        </div>
+                      </div>
+                    </div>
 
                 <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 6 }}>
                   Analysis Summary
@@ -394,6 +441,16 @@ export default function SessionDetailUI({ sessionId, onBack }: Props) {
                     >
                       🫁 {session.result.respRate} BrPM
                     </div>
+                  )}
+                </div>
+
+                {/* Threshold Bands */}
+                <div style={{ marginTop: 20 }}>
+                  {session.type === "heart" && session.result.heartRate != null && (
+                    <ThresholdBands type="heart" value={session.result.heartRate} />
+                  )}
+                  {session.type === "lung" && session.result.respRate != null && (
+                    <ThresholdBands type="lung" value={session.result.respRate} />
                   )}
                 </div>
               </div>

@@ -5,8 +5,11 @@ export interface HeartResult {
   status: string;
   heartRate: number;
   murmurDetected?: boolean;
+  murmurSeverity?: string;
+  murmurPattern?: string;
   aiConfidence: number;
   summary: string;
+  duration?: number; // in seconds
 }
 
 /* ---------------- LUNG RESULT ---------------- */
@@ -15,8 +18,10 @@ export interface LungResult {
   respRate: number;
   cracklesDetected: boolean;
   wheezesDetected: boolean;
+  crackleType?: string;
   aiConfidence: number;
   summary: string;
+  duration?: number; // in seconds
 }
 
 /* ---------------- SESSION ---------------- */

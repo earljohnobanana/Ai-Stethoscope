@@ -1,6 +1,12 @@
 import SessionMetric from "./SessionMetric";
 import type { Session } from "../../models/Session";
 import type { HeartResult, LungResult } from "../../models/Session";
+import { 
+  getHeartRateRiskLevel, 
+  getRespRateRiskLevel, 
+  getRiskLevelConfig, 
+  getRiskLevelIndicator 
+} from "../../utils/riskLevel";
 
 interface Props {
   session: Session;
@@ -14,6 +20,16 @@ export default function SessionCard({ session, onClick }: Props) {
   // Always show normalized name (SessionHistoryUI already ensures it)
   const title = session.name;
 
+  // Determine risk level
+  let riskLevel: "green" | "amber" | "red" = "green";
+  if (isHeart && isHeartResult(result) && result.heartRate != null) {
+    riskLevel = getHeartRateRiskLevel(result.heartRate);
+  } else if (!isHeart && isLungResult(result) && result.respRate != null) {
+    riskLevel = getRespRateRiskLevel(result.respRate);
+  }
+
+  const riskConfig = getRiskLevelConfig(riskLevel);
+
   return (
     <div
       onClick={onClick}
@@ -21,8 +37,8 @@ export default function SessionCard({ session, onClick }: Props) {
         width: "100%",
         padding: 16,
         borderRadius: 18,
-        border: "1px solid #e2e8f0",
-        background: "#ffffff",
+        border: `1px solid ${riskConfig.borderColor}`,
+        background: riskConfig.bgColor,
         cursor: "pointer",
         boxSizing: "border-box",
       }}
@@ -37,6 +53,16 @@ export default function SessionCard({ session, onClick }: Props) {
           <div style={{ fontSize: 12, color: "#64748b" }}>
             {new Date(session.date).toLocaleString()}
           </div>
+        </div>
+
+        <div 
+          style={{ 
+            fontSize: 24,
+            alignSelf: "flex-start"
+          }}
+          title={riskConfig.label}
+        >
+          {getRiskLevelIndicator(riskLevel)}
         </div>
       </div>
 
@@ -57,6 +83,12 @@ export default function SessionCard({ session, onClick }: Props) {
         )}
 
         <SessionMetric label="Status" value={result.status ?? "—"} />
+        
+        <SessionMetric 
+          label="Risk Level" 
+          value={riskConfig.label} 
+          style={{ color: riskConfig.textColor, fontWeight: 600 }}
+        />
       </div>
     </div>
   );
